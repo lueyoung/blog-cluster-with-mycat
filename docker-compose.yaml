@@ -1,0 +1,112 @@
+version: "3.3"
+services:
+  mysql_master:
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+    ports:
+      - "3333:3306"
+    volumes:
+      - "/opt/workspace/mysql_cluster/master/my.cnf:/etc/mysql/conf.d/my.cnf"
+
+  mysql_slave1:
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+    volumes:
+      - "/opt/workspace/mysql_cluster/slave1/my.cnf:/etc/mysql/conf.d/my.cnf"
+      - "/opt/workspace/mysql_cluster/init/init.sql.slave:/docker-entrypoint-initdb.d/init.sql"
+    depends_on:
+      - mysql_master
+    links:
+      - mysql_master
+
+  mysql_slave2:
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+    volumes:
+      - "/opt/workspace/mysql_cluster/slave2/my.cnf:/etc/mysql/conf.d/my.cnf"
+      - "/opt/workspace/mysql_cluster/init/init.sql.slave:/docker-entrypoint-initdb.d/init.sql"
+    depends_on:
+      - mysql_master
+    links:
+      - mysql_master
+
+  wordpress1:
+    depends_on:
+      - mycat 
+    links:
+      - mycat:mysql
+    image: wordpress:latest
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: "123456"
+
+  wordpress2:
+    depends_on:
+      - mycat 
+    links:
+      - mycat:mysql
+    image: wordpress:latest
+    restart: always
+    ports:
+      - "8070:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: "123456"
+
+  wordpress3:
+    depends_on:
+      - mycat 
+    links:
+      - mycat:mysql
+    image: wordpress:latest
+    restart: always
+    ports:
+      - "8060:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: "123456"
+
+  nginx:
+    depends_on:
+      - wordpress1
+      - wordpress2
+      - wordpress3
+    image: nginx:latest
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - "/opt/workspace/nginx/nginx.conf:/etc/nginx/nginx.conf"
+
+  mycat:
+    image: lowyard/mycat:latest
+    depends_on:
+      - mysql_master
+      - mysql_slave1
+      - mysql_slave2
+    links:
+      - mysql_master
+      - mysql_slave1
+      - mysql_slave2
+    container_name: mycat
+    volumes:
+      - /opt/workspace/mysql_cluster/config/mycat/:/mycat/conf/
+      #- ./log/mycat-logs/:/mycat/logs/:rw
+      #- /etc/localtime:/etc/localtime:ro
+      #- ./config/hosts:/etc/hosts:ro
+    ports:
+      - "8066:3306"
+      - "9066:9066"
+    ulimits:
+      nproc: 65535
+    hostname: mycat
+    restart: always
